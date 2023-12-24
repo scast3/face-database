@@ -1,56 +1,83 @@
 import cv2 as cv
 import pg8000
-
 import getpass
 
-from pg8000 import Connection, Cursor
-from typing import List, Tuple, Optional
+# Function to insert data into the PostgreSQL database
+def insert_data(conn, name, image_data):
+    try:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO faces_table (name, image) VALUES (%s, %s)", (name, image_data))
+        conn.commit()
+        print("Data inserted successfully!")
+    except pg8000.Error as e:
+        print(f"Error inserting data: {e}")
 
-# live webcam face detection
 
-# connect to postgres database
-def get_connection() -> Optional[Connection]:
-    """
-    Creates a connection to the database
-    """
-    # get the username and password
+# Function to capture and process images
+def capture_images(conn):
+
+    capture = cv.VideoCapture(0)  # Access to webcam
+
+    # Load the Haar cascade for face detection
+    haar_cascade = cv.CascadeClassifier('haar_face.xml')
+
+    while True:
+        is_true, frame = capture.read()
+        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        faces_rect = haar_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=1)
+
+        for (x, y, w, h) in faces_rect:
+            cv.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), thickness=2)
+
+            # face region of interest
+            face_roi = gray[y:y + h, x:x + w]
+
+            # Prompt user for name
+            name = input("Enter name for this face: ")
+
+            # Convert the image to binary data
+            _, img_encoded = cv.imencode('.jpg', face_roi)
+            image_data = img_encoded.tobytes()
+
+            # Insert the face data into the PostgreSQL database
+            insert_data(conn, name, image_data)
+
+        cv.imshow('Face Detection', frame)  # Display each frame of the video
+
+        if cv.waitKey(20) & 0xFF == ord('q'):  # Press 'q' to quit
+            break
+
+    capture.release()
+    cv.destroyAllWindows()
+
+# Connect to PostgreSQL database
+def get_connection() -> pg8000.Connection:
+    # Get the username and password
     username = input('Username: ')
     password = getpass.getpass('Password: ')
 
-    # connect to the database
+    # Connect to the database
     credentials = {
         'user': username,
         'password': password,
         'database': 'faces',
-        'port': 5433,
+        'port': 5432,  # Change to your PostgreSQL port if different
         'host': 'localhost'
     }
     try:
         db = pg8000.connect(**credentials)
-        # do not change the autocommit line below or set autocommit to true in your solution
-        # this lab requires you add appropriate db.commit() calls
         db.autocommit = False
+        return db
     except pg8000.Error as e:
         print(f'Authentication failed for user "{username}" (error: {e})\n')
         return None
 
-    return db
+# Main function to initiate the process
+def main():
+    connection = get_connection()
+    if connection:
+        capture_images(connection)
+        connection.close()
 
-capture = cv.VideoCapture(0) # access to webcam
-
-haar_cascade = cv.CascadeClassifier('haar_face.xml')
-
-while True:
-    isTrue, frame = capture.read()
-    gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY) 
-    faces_rect = haar_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=1) 
-
-    for (x,y,w,h) in faces_rect:
-        cv.rectangle(frame, (x,y), (x+w,y+h), (0,255,0), thickness=2)
-
-    cv.imshow('Face Detection', frame) #displays each frame of the video
-
-    if cv.waitKey(20) & 0xFF==ord('d'): #if the letter d is pressed, stop displaying video
-        break
-capture.release()
-cv.destroyAllWindows()
+if __name__ == "__main__":
+    main()
