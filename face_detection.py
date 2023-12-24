@@ -1,5 +1,40 @@
 import cv2 as cv
+import pg8000
+
+import getpass
+
+from pg8000 import Connection, Cursor
+from typing import List, Tuple, Optional
+
 # live webcam face detection
+
+# connect to postgres database
+def get_connection() -> Optional[Connection]:
+    """
+    Creates a connection to the database
+    """
+    # get the username and password
+    username = input('Username: ')
+    password = getpass.getpass('Password: ')
+
+    # connect to the database
+    credentials = {
+        'user': username,
+        'password': password,
+        'database': 'faces',
+        'port': 5433,
+        'host': 'localhost'
+    }
+    try:
+        db = pg8000.connect(**credentials)
+        # do not change the autocommit line below or set autocommit to true in your solution
+        # this lab requires you add appropriate db.commit() calls
+        db.autocommit = False
+    except pg8000.Error as e:
+        print(f'Authentication failed for user "{username}" (error: {e})\n')
+        return None
+
+    return db
 
 capture = cv.VideoCapture(0) # access to webcam
 
