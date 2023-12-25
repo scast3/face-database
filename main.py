@@ -1,15 +1,18 @@
-import cv2 as cv
 import pg8000
 import getpass
 import json
 from datetime import datetime
+from face_rec import capture_images, face_recognition
+# Face Recognition Database
+# Using webcam, will recognize faces from a face database
+# Hope to use this in a potential security project
 
 # Function to insert data into the PostgreSQL database
 def insert_data(conn, name, image_data):
     try:
         cursor = conn.cursor()
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
+        other_attributes = {'status': 'new'}
 
         cursor.execute("""
             INSERT INTO face_recognition.person_info (person_name, image_data, other_attributes, created_at)
@@ -20,43 +23,6 @@ def insert_data(conn, name, image_data):
     except pg8000.Error as e:
         print(f"Error inserting data: {e}")
 
-
-# Function to capture and process images
-def capture_images(conn):
-
-    capture = cv.VideoCapture(0)  # Access to webcam
-
-    # Load the Haar cascade for face detection
-    haar_cascade = cv.CascadeClassifier('haar_face.xml')
-
-    while True:
-        is_true, frame = capture.read()
-        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-        faces_rect = haar_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=1)
-
-        for (x, y, w, h) in faces_rect:
-            cv.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), thickness=2)
-
-            # face region of interest
-            face_roi = gray[y:y + h, x:x + w]
-
-            # Prompt user for name
-            name = input("Enter name for this face: ")
-
-            # Convert the image to binary data
-            _, img_encoded = cv.imencode('.jpg', face_roi)
-            image_data = img_encoded.tobytes()
-
-            # Insert the face data into the PostgreSQL database
-            insert_data(conn, name, image_data)
-
-        cv.imshow('Face Detection', frame)  # Display each frame of the video
-
-        if cv.waitKey(20) & 0xFF == ord('q'):  # Press 'q' to quit
-            break
-
-    capture.release()
-    cv.destroyAllWindows()
 
 # Function to access the database
 def search(db):
@@ -75,16 +41,61 @@ def search(db):
             print('Invalid choice. Try again.')
         print(' ')
 
+# searches a face based on the id
+def search_by_id(db, id):
+    cursor = db.cursor()
+    query = """SELECT person_id, person_name, created_at 
+               FROM person_info
+               WHERE person_id = %s
+               ORDER BY created_at"""
+    try:
+        cursor.execute(query, (id, ))
+        resultset = cursor.fetchall()
+        return resultset
+
+    except pg8000.Error as e:
+        print("Database error\n")
+        return []
+
 def alter(db):
     while True:
         choice = input('Add attributes (A), delete face (D)')
         if choice == 'A' or 'a':
             id = input('Enter face ID:')
-            add_attribute(db, id) # implement this later
+            add_attribute(db, id, attribute) # fix
         elif choice == 'D' or choice == 'd':
             id = input('Enter face ID:')
-            delete(db, id) # implement this later
+            delete(db, id)
 
+# adds an attribute
+def add_attribute(db, id, attribute):
+    cursor = db.cursor()
+    query = """UPDATE person_info
+                SET other_attributes = %s
+                WHERE person_id = %s """
+    try:
+        cursor.execute(query, (attribute, id))
+        db.commit()
+        print(f'Altered attributes of: {id}')
+    except pg8000.Error as e:
+        db.rollback()
+        print("Face does not exist (invalid face id), or not properly implemented.")
+        print('Details: ' + id)
+        print(e)
+
+# deletes a face based on the face id
+def delete(db, id):
+    cursor = db.cursor()
+    query = "DELETE FROM person_info WHERE person_id = %s"
+    try:
+        cursor.execute(query, (id, ))
+        db.commit()
+        print('Delete face: ' + str(id))
+    except pg8000.Error as e:
+        db.rollback()
+        print("Face does not exist (invalid face id), or not properly implemented.")
+        print('Details: ' + id)
+        print(e)
 
 # Connect to PostgreSQL database
 def get_connection() -> pg8000.Connection:
@@ -121,9 +132,11 @@ def main():
 
     # main loop
     while True:
-        choice = input('Capture New Face (N)\nSearch Database (S)\nAlter Database (A)\nQuit (Q)\n')
+        choice = input('Capture New Face (N)\nFace Recognition (R)\nSearch Database (S)\nAlter Database (A)\nQuit (Q)\n')
         if choice == 'N' or choice == 'n':
             capture_images(db)
+        elif choice == 'F' or choice == 'f':
+            face_recognition(db)
         elif choice == 'S' or choice == 's':
             search(db)
         elif choice == 'A' or choice == 'a':
