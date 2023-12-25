@@ -1,12 +1,20 @@
 import cv2 as cv
 import pg8000
 import getpass
+import json
+from datetime import datetime
 
 # Function to insert data into the PostgreSQL database
 def insert_data(conn, name, image_data):
     try:
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO faces_table (name, image) VALUES (%s, %s)", (name, image_data))
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+        cursor.execute("""
+            INSERT INTO face_recognition.person_info (person_name, image_data, other_attributes, created_at)
+            VALUES (%s, %s, %s::jsonb, %s)
+        """, (name, image_data, json.dumps(other_attributes), timestamp))
         conn.commit()
         print("Data inserted successfully!")
     except pg8000.Error as e:
@@ -50,6 +58,34 @@ def capture_images(conn):
     capture.release()
     cv.destroyAllWindows()
 
+# Function to access the database
+def search(db):
+    
+    while True:
+        choice = input('Search by face ID (F) or by name (N)?: ')
+        if choice == 'F' or choice == 'f':
+            id = input('Enter face ID: ')
+            search_by_id(db, id) # implement this later
+            break
+        elif choice == 'N' or choice == 'n':
+            name = input('Enter name (first and last): ')
+            search_by_name(db, name) # implement this later
+            break
+        else:
+            print('Invalid choice. Try again.')
+        print(' ')
+
+def alter(db):
+    while True:
+        choice = input('Add attributes (A), delete face (D)')
+        if choice == 'A' or 'a':
+            id = input('Enter face ID:')
+            add_attribute(db, id) # implement this later
+        elif choice == 'D' or choice == 'd':
+            id = input('Enter face ID:')
+            delete(db, id) # implement this later
+
+
 # Connect to PostgreSQL database
 def get_connection() -> pg8000.Connection:
     # Get the username and password
@@ -61,7 +97,7 @@ def get_connection() -> pg8000.Connection:
         'user': username,
         'password': password,
         'database': 'faces',
-        'port': 5432,  # Change to your PostgreSQL port if different
+        'port': 5432,
         'host': 'localhost'
     }
     try:
@@ -72,12 +108,33 @@ def get_connection() -> pg8000.Connection:
         print(f'Authentication failed for user "{username}" (error: {e})\n')
         return None
 
+
 # Main function to initiate the process
+    
 def main():
-    connection = get_connection()
-    if connection:
-        capture_images(connection)
-        connection.close()
+    # connect to the database. Loop until we get a db object.
+    # This tells us that the user has successfully logged in.
+    while True:
+        db = get_connection()
+        if db is not None:
+            break
+
+    # main loop
+    while True:
+        choice = input('Capture New Face (N)\nSearch Database (S)\nAlter Database (A)\nQuit (Q)\n')
+        if choice == 'N' or choice == 'n':
+            capture_images(db)
+        elif choice == 'S' or choice == 's':
+            search(db)
+        elif choice == 'A' or choice == 'a':
+            alter(db)
+        elif (choice == 'Q' or choice == 'q'):
+            print("Ending Session ... ")
+            break
+        else:
+            print("Invalid choice. Try again.")
+        print(" ")
+
 
 if __name__ == "__main__":
     main()
