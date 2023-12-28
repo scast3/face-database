@@ -19,16 +19,6 @@ def capture_images(conn):
             # face region of interest
             face_roi = gray[y:y + h, x:x + w]
 
-            # Prompt user for name
-            name = input("Enter name for this face: ")
-
-            # Convert the image to binary data
-            _, img_encoded = cv.imencode('.jpg', face_roi)
-            image_data = img_encoded.tobytes()
-
-            # Insert the face data into the PostgreSQL database
-            insert_data(conn, name, image_data)
-
         cv.imshow('Face Detection', frame)  # Display each frame of the video
 
         if cv.waitKey(20) & 0xFF == ord('q'):  # Press 'q' to quit

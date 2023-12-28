@@ -57,6 +57,21 @@ def search_by_id(db, id):
         print("Database error\n")
         return []
 
+def search_by_name(db, name):
+    cursor = db.cursor()
+    query = """SELECT person_id, person_name, created_at 
+               FROM person_info
+               WHERE person_id = %s
+               ORDER BY created_at"""
+    try:
+        cursor.execute(query, (name, ))
+        resultset = cursor.fetchall()
+        return resultset
+
+    except pg8000.Error as e:
+        print("Database error\n")
+        return []
+
 def alter(db):
     while True:
         choice = input('Add attributes (A), delete face (D)')
