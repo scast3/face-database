@@ -1,8 +1,9 @@
 SET search_path = public, face_recognition;
 
+BEGIN
 -- Host: localhost
 -- Port: 5432
--- Username: postgres
+-- Username: postgres TODO - assign perms and set a real username
 -- TODO: make sure schema is good
 
 -- Schema Design:
@@ -25,6 +26,11 @@ CREATE TABLE face_recognition.person (
     primary_photo BYTEA NOT NULL,
     has_permission BOOLEAN,
     notes JSONB,
-    user, -- allow user to set username and password ??? potentially
-    pass, 
-)
+    userN TEXT NOT NULL, -- allow user to set username and password ??? potentially
+    passW TEXT NOT NULL 
+);
+
+ALTER TABLE face_recognition.person
+ADD FOREIGN KEY person.person_id REFERENCES photo_info.person_id
+
+COMMIT
