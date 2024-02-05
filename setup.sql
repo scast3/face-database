@@ -13,7 +13,7 @@ BEGIN
 -- Ideally, everyone's face will be in this table, need to make sure that these are the appropriate attributes
 CREATE TABLE face_recognition.photo_info (
     photo_id SERIAL PRIMARY KEY, -- unique to each photo
-    person_id -- references people.person_id, assigned by user specification
+    person_id INTEGER,-- references people.person_id, assigned by user specification
     image_data BYTEA NOT NULL, -- Assuming storing images as byte data
     other_attributes JSONB, -- You can store additional attributes in JSON format
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -29,8 +29,8 @@ CREATE TABLE face_recognition.person (
     userN TEXT NOT NULL, -- allow user to set username and password ??? potentially
     passW TEXT NOT NULL 
 );
-
-ALTER TABLE face_recognition.person
-ADD FOREIGN KEY person.person_id REFERENCES photo_info.person_id
-
+-- creating fkey
+ALTER TABLE face_recognition.photo_info
+ADD CONSTRAINT fk_person_id
+FOREIGN KEY (person_id) REFERENCES face_recognition.person(person_id);
 COMMIT
